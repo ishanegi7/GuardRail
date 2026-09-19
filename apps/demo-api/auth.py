@@ -7,7 +7,10 @@ from sqlalchemy.orm import Session
 import models
 from database import get_db
 
-SECRET_KEY = "super-secret-key-for-demo-purposes"
+import os
+import secrets
+
+SECRET_KEY = os.environ.get("JWT_SECRET_KEY", secrets.token_urlsafe(32))
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

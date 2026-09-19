@@ -18,6 +18,9 @@ def run_servers():
     # Start GuardRail API
     print("Starting guardrail-api on 8000...")
     env["DEMO_API_URL"] = "http://127.0.0.1:8080"
+    env["SANDBOX_DIR"] = os.path.abspath("apps/demo-api")
+    import tempfile
+    env["TARGET_SANDBOX_DIR"] = os.path.join(tempfile.gettempdir(), "guardrail-sandbox-test")
     api = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "main:app", "--port", "8000"],
         cwd="apps/api",
@@ -59,9 +62,12 @@ def test_workflow():
         r = httpx.get(f"http://127.0.0.1:8000/api/scans")
         scans = r.json()
         scan = next(s for s in scans if s["id"] == scan_id)
-        if scan["status"] == "completed":
+        if scan["status"] in ["completed", "failed"]:
             break
         time.sleep(1)
+        
+    if scan["status"] != "completed":
+        raise Exception(f"Scan failed to complete. Final status: {scan['status']}")
         
     r = httpx.get(f"http://127.0.0.1:8000/api/findings?scan_id={scan_id}")
     findings = r.json()

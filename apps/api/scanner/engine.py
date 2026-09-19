@@ -85,20 +85,22 @@ class ScannerEngine:
         self.db.add(finding)
         self.db.commit()
 
-async def run_scan(scan_id: int, project: models.Project, db: Session):
+async def run_scan(scan_id: int, project_id: int):
     # This function is run as a background task. 
-    # Because FastAPI's Depends(get_db) session doesn't work well across threads in background tasks sometimes if we don't manage it carefully.
-    # But since we passed db from main, we use it (or we should create a new one). 
-    # To be safe, we create a new session.
     from database.db import SessionLocal
     local_db = SessionLocal()
     try:
+        project = local_db.query(models.Project).filter(models.Project.id == project_id).first()
+        if not project:
+            return
+            
         engine = ScannerEngine(project.target_url, project.openapi_spec, scan_id, local_db)
-        # Create a new event loop or use existing since we are in async context?
-        # background_tasks runs in threadpool. So we need asyncio.run if this is synchronous wrapper.
-        # Wait, run_scan is def or async def? I defined it as async def... wait, I didn't. 
-        # Let's fix that. It needs to be a sync wrapper if we use background_tasks.add_task(sync_func) or async if we use async func.
-        # BackgroundTasks handles both.
         await engine.run()
+    except Exception as e:
+        print(f"Error in scan {scan_id}: {e}")
+        scan = local_db.query(models.Scan).filter(models.Scan.id == scan_id).first()
+        if scan:
+            scan.status = "failed"
+            local_db.commit()
     finally:
         local_db.close()

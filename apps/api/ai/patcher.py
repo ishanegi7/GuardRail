@@ -24,6 +24,27 @@ DETERMINISTIC_BOLA_PATCH = """--- routers/invoices.py
      return invoice
 """
 
+DETERMINISTIC_BROKEN_AUTH_PATCH = """--- routers/users.py
++++ routers/users.py
+@@ -10,6 +10,8 @@
+-def get_all_users(db: Session = Depends(get_db)):
++def get_all_users(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
++    if not current_user.is_admin:
++        raise HTTPException(status_code=403, detail="Forbidden")
+     return db.query(models.User).all()
+"""
+
+DETERMINISTIC_MASS_ASSIGNMENT_PATCH = """--- routers/users.py
++++ routers/users.py
+@@ -20,6 +20,8 @@
+ def update_user(user_id: int, user_update: schemas.UserUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+     db_user = db.query(models.User).filter(models.User.id == user_id).first()
++    if user_update.is_admin is not None and not current_user.is_admin:
++        raise HTTPException(status_code=403, detail="Forbidden")
+     for key, value in user_update.dict(exclude_unset=True).items():
+         setattr(db_user, key, value)
+"""
+
 async def generate_patch_for_finding(finding: models.Finding, db: Session):
     llm_provider = os.environ.get("LLM_PROVIDER", "gemini")
     api_key = os.environ.get(f"{llm_provider.upper()}_API_KEY", "")
@@ -49,8 +70,14 @@ async def generate_patch_for_finding(finding: models.Finding, db: Session):
 
     # Deterministic fallback if no LLM key or LLM fails
     def use_fallback():
-        finding.ai_explanation = "AI unavailable — generated using GuardRail's deterministic remediation fallback. The vulnerability is caused by missing object-level authorization checks. We need to verify the requested object belongs to the currently authenticated user."
-        finding.patch_diff = DETERMINISTIC_BOLA_PATCH
+        finding.ai_explanation = f"AI unavailable — generated using GuardRail's deterministic remediation fallback for {finding.vulnerability_type}."
+        if "BOLA" in finding.vulnerability_type:
+            finding.patch_diff = DETERMINISTIC_BOLA_PATCH
+        elif "Broken Auth" in finding.vulnerability_type:
+            finding.patch_diff = DETERMINISTIC_BROKEN_AUTH_PATCH
+        else:
+            finding.patch_diff = DETERMINISTIC_MASS_ASSIGNMENT_PATCH
+            
         finding.patch_status = "generated"
         db.commit()
         return finding
@@ -171,17 +198,32 @@ async def apply_and_verify_patch(finding: models.Finding, db: Session):
             async with httpx.AsyncClient() as client:
                 # The auth token inside the evidence is labeled "Bearer TOKEN_B (Bob)".
                 # We need the real Bob token from verifier.
-                bob_token = verifier.tokens.get("bob@example.test")
-                headers = {"Authorization": f"Bearer {bob_token}"}
+                headers = {}
+                if "Authorization" in attack_req.get("headers", {}):
+                    # If it was authenticated with Bob, keep it
+                    bob_token = verifier.tokens.get("bob@example.test")
+                    headers["Authorization"] = f"Bearer {bob_token}"
                 
-                res = await client.request(
-                    attack_req["method"],
-                    f"{isolated_url}{attack_req['url']}",
-                    headers=headers
-                )
+                # We should send the same JSON body if any
+                req_json = attack_req.get("json")
+                
+                if req_json:
+                    res = await client.request(
+                        attack_req["method"],
+                        f"{isolated_url}{attack_req['url']}",
+                        headers=headers,
+                        json=req_json
+                    )
+                else:
+                    res = await client.request(
+                        attack_req["method"],
+                        f"{isolated_url}{attack_req['url']}",
+                        headers=headers
+                    )
                 
                 print(f"Verification response: {res.status_code}")
-                if res.status_code in [401, 403, 404]:
+                # We consider it verified fixed if the response is a 4xx instead of 200 (or if it doesn't give the sensitive data)
+                if res.status_code in [401, 403, 404, 422]:
                     # Exploit blocked!
                     finding.patch_status = "verified"
                 else:

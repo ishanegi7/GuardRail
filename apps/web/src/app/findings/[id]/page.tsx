@@ -11,7 +11,7 @@ export default function FindingPage() {
   const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
-    fetch(`http://localhost:8000/api/findings/${id}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/findings/${id}`)
       .then(res => res.json())
       .then(data => {
         setFinding(data);
@@ -22,7 +22,7 @@ export default function FindingPage() {
   const generatePatch = async () => {
     setPatching(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/findings/${id}/generate-patch`, { method: "POST" });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/findings/${id}/generate-patch`, { method: "POST" });
       const data = await res.json();
       setFinding(data);
     } catch(e) {
@@ -34,7 +34,7 @@ export default function FindingPage() {
   const applyPatch = async () => {
     setVerifying(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/findings/${id}/verify-patch`, { method: "POST" });
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/findings/${id}/verify-patch`, { method: "POST" });
       const data = await res.json();
       setFinding(data);
     } catch(e) {

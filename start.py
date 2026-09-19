@@ -14,6 +14,8 @@ demo_api = subprocess.Popen(
 print("Starting apps/api on port 8000...")
 env["DEMO_API_URL"] = "http://127.0.0.1:8080"
 env["SANDBOX_DIR"] = os.path.abspath("apps/demo-api")
+import tempfile
+env["TARGET_SANDBOX_DIR"] = os.path.join(tempfile.gettempdir(), "guardrail-sandbox")
 api = subprocess.Popen(
     [sys.executable, "-m", "uvicorn", "main:app", "--port", "8000"],
     cwd="apps/api",

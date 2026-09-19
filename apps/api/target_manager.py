@@ -5,11 +5,12 @@ import time
 import httpx
 
 class TargetManager:
-    def __init__(self, original_source_dir: str = "/sandbox/demo-api", sandbox_dir: str = "/tmp/sandbox/demo-api"):
-        self.original_source_dir = original_source_dir
-        self.sandbox_dir = sandbox_dir
+    def __init__(self, source_dir: str = None, sandbox_dir: str = None):
+        self.source_dir = source_dir or os.environ.get("TARGET_SOURCE_DIR", os.environ.get("SANDBOX_DIR", "/sandbox/demo-api"))
+        self.sandbox_dir = sandbox_dir or os.environ.get("TARGET_SANDBOX_DIR", "/tmp/sandbox/demo-api")
         self.port = 8081
         self.process = None
+        self.original_source_dir = self.source_dir
 
     def create_isolated_workspace(self):
         # Create a fresh copy of the demo target
@@ -67,10 +68,17 @@ class TargetManager:
         return f"http://127.0.0.1:{self.port}"
         
     def apply_patch(self, diff_content: str, file_path_relative: str):
+        if ".." in diff_content or "\n--- /" in diff_content or "\n+++ /" in diff_content:
+            raise Exception("Potentially malicious patch detected (path traversal or absolute path).")
+            
         patch_path = os.path.join(self.sandbox_dir, "fix.patch")
         with open(patch_path, "w") as f:
             f.write(diff_content)
             
+        import shutil
+        if not shutil.which("patch"):
+            raise Exception("The 'patch' command is not available on this system.")
+
         # Run patch -p0 < fix.patch
         with open(patch_path, "r") as f:
             result = subprocess.run(["patch", "-p0"], stdin=f, capture_output=True, text=True, cwd=self.sandbox_dir)

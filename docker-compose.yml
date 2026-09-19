@@ -30,6 +30,7 @@ services:
     volumes:
       - ./apps/demo-api:/sandbox/demo-api:ro
       - ./data/api:/app/data
+      - ./tests:/app/tests
     depends_on:
       - demo-api
     networks:

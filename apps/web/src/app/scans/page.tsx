@@ -13,7 +13,8 @@ export default function ScansPage() {
     setFindings([]);
     try {
       // 1. Get projects
-      const resProj = await fetch("http://localhost:8000/api/projects");
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const resProj = await fetch(`${API_URL}/api/projects`);
       const projects = await resProj.json();
       const projId = projects[0]?.id;
       
@@ -24,7 +25,7 @@ export default function ScansPage() {
       }
 
       // 2. Start scan
-      const resScan = await fetch("http://localhost:8000/api/scans", {
+      const resScan = await fetch(`${API_URL}/api/scans`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ project_id: projId })
@@ -40,17 +41,18 @@ export default function ScansPage() {
   };
 
   useEffect(() => {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
     let interval: NodeJS.Timeout;
     if (scanning && scanId) {
       interval = setInterval(async () => {
         try {
           // Poll findings
-          const resFind = await fetch(`http://localhost:8000/api/findings?scan_id=${scanId}`);
+          const resFind = await fetch(`${API_URL}/api/findings?scan_id=${scanId}`);
           const data = await resFind.json();
           setFindings(data);
           
           // Poll scan status
-          const resScans = await fetch("http://localhost:8000/api/scans");
+          const resScans = await fetch(`${API_URL}/api/scans`);
           const scans = await resScans.json();
           const scan = scans.find((s: any) => s.id === scanId);
           

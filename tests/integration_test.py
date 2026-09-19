@@ -5,7 +5,7 @@ import asyncio
 import os
 
 API_URL = os.environ.get("API_URL", "http://localhost:8000")
-DEMO_URL = os.environ.get("DEMO_URL", "http://localhost:8080")
+DEMO_URL = os.environ.get("DEMO_URL", "http://demo-api:8080")
 
 @pytest.mark.asyncio
 async def test_end_to_end_bola_fix():
@@ -36,11 +36,11 @@ async def test_end_to_end_bola_fix():
             res = await client.get(f"{API_URL}/api/scans")
             scans = res.json()
             scan = next(s for s in scans if s["id"] == scan_id)
-            if scan["status"] == "completed":
+            if scan["status"] in ["completed", "failed"]:
                 break
             time.sleep(2)
         
-        assert scan["status"] == "completed"
+        assert scan["status"] == "completed", f"Scan failed to complete. Final status: {scan['status']}"
 
         # 3. Verify BOLA is found
         res = await client.get(f"{API_URL}/api/findings?scan_id={scan_id}")

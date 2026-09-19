@@ -1,4 +1,5 @@
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Security, Request
+from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from database.db import engine, Base, SessionLocal, get_db
@@ -8,11 +9,19 @@ import httpx
 from scanner.engine import run_scan
 from ai.patcher import generate_patch_for_finding, apply_and_verify_patch
 
-app = FastAPI(title="GuardRail API", version="1.0.0")
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+def verify_api_key(api_key: str = Security(api_key_header)):
+    expected_key = os.environ.get("GUARDRAIL_API_KEY")
+    if expected_key and api_key != expected_key:
+        raise HTTPException(status_code=403, detail="Could not validate credentials")
+    return api_key
+
+app = FastAPI(title="GuardRail AI API", dependencies=[Depends(verify_api_key)])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Next.js frontend
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,7 +68,7 @@ def create_scan(scan: schemas.ScanCreate, background_tasks: BackgroundTasks, db:
     db.commit()
     db.refresh(db_scan)
     
-    background_tasks.add_task(run_scan, db_scan.id, project, db)
+    background_tasks.add_task(run_scan, db_scan.id, project.id)
     
     return db_scan
 
