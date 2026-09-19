@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - api
+    networks:
+      - guardrail-net
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/guardrail.db
+      - DEMO_API_URL=http://demo-api:8080
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+    volumes:
+      - ./apps/demo-api:/sandbox/demo-api:ro
+      - ./data/api:/app/data
+    depends_on:
+      - demo-api
+    networks:
+      - guardrail-net
+
+  demo-api:
+    build:
+      context: ./apps/demo-api
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./apps/demo-api:/app:ro # Mount source read-only
+      - ./data/demo:/app/data
+    environment:
+      - DATABASE_URL=sqlite:///./data/demo.db
+    networks:
+      - guardrail-net
+
+networks:
+  guardrail-net:
+    driver: bridge
