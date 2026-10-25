@@ -44,12 +44,12 @@ make up
 docker compose up --build
 ```
 
-- **Dashboard:** http://localhost:3000
-- **GuardRail API:** http://localhost:8000
-- **Demo API (Vulnerable Target):** http://localhost:8080
+- **Dashboard:** 
+- **GuardRail API:**
+- **Demo API (Vulnerable Target):**
 
 ### Trying the Demo
-1. Open the Dashboard at `http://localhost:3000`.
+1. Open the Dashboard at ``.
 2. Click **Try Demo Scan**. This will parse the demo API, execute test cases, and discover a BOLA vulnerability, Broken Auth, and Mass Assignment.
 3. Click **Review Finding** on the BOLA vulnerability.
 4. Click **Generate AI Fix** to get an explanation and patch.
